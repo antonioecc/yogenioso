@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yogenioso-v5';
+const CACHE_NAME = 'yogenioso-v6';
 const ASSETS = [
   './',
   './index.html',

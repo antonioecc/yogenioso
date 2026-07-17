@@ -1,4 +1,11 @@
-// Módulo de efectos de sonido usando Web Audio API y Síntesis de voz (SpeechSynthesis)
+// ============================================================
+// Módulo de Audio — Web Audio API + SpeechSynthesis
+// IMPORTANTE (iOS Safari): AudioContext debe crearse y resumirse
+// de forma SÍNCRONA dentro del handler del gesto del usuario.
+// Usar async/await rompe el contexto del gesto en iOS y el audio
+// queda bloqueado. Todos los métodos son SÍNCRONOS.
+// ============================================================
+
 class AudioManager {
   constructor() {
     this.ctx = null;
@@ -7,9 +14,11 @@ class AudioManager {
     this._unlocked = false;
     this._voices = [];
 
-    // Pre-cargar voces TTS en cuanto estén disponibles (iOS necesita esto)
+    // Cargar voces TTS lo antes posible
+    // iOS entrega las voces de forma diferida; necesitamos onvoiceschanged
     this._loadVoices();
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+    if (typeof window.speechSynthesis !== 'undefined' &&
+        window.speechSynthesis.onvoiceschanged !== undefined) {
       window.speechSynthesis.onvoiceschanged = () => this._loadVoices();
     }
   }
@@ -21,46 +30,61 @@ class AudioManager {
     }
   }
 
-  // init() es async para poder hacer await ctx.resume() correctamente en iOS
-  async init() {
-    if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    // En iOS el contexto arranca suspendido y resume() es una promesa
-    if (this.ctx.state === 'suspended') {
-      try {
-        await this.ctx.resume();
-      } catch (e) {
-        console.warn('AudioContext resume falló:', e);
+  // ─────────────────────────────────────────────────────────
+  // init() — DEBE llamarse SÍNCRONAMENTE desde un gesto del usuario.
+  // Crea el AudioContext, lo resume y toca un buffer silencioso
+  // para desbloquear el audio en iOS. NO usa await.
+  // ─────────────────────────────────────────────────────────
+  init() {
+    try {
+      // 1. Crear el contexto (síncrono — dentro del gesto)
+      if (!this.ctx) {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
       }
-    }
 
-    if (!this._unlocked) {
-      // Reproducir buffer silencioso para desbloquear el contexto en iOS Safari
-      try {
+      // 2. Resume síncrono — iOS exige que resume() se llame en el gesto.
+      //    NO hacemos await; solo disparamos la promesa.
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume(); // fire-and-forget intencional
+      }
+
+      // 3. Buffer silencioso para forzar desbloqueo completo en iOS
+      if (!this._unlocked) {
         const buffer = this.ctx.createBuffer(1, 1, 22050);
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
         source.connect(this.ctx.destination);
         source.start(0);
         this._unlocked = true;
-      } catch (e) {
-        console.warn('No se pudo reproducir el buffer de desbloqueo silencioso:', e);
       }
+    } catch (e) {
+      console.warn('AudioContext init error:', e);
     }
   }
 
-  // Helper interno: garantiza que el contexto está activo antes de usar
-  async _ensureCtx() {
-    await this.init();
-    return this.ctx;
+  // ─────────────────────────────────────────────────────────
+  // _ctx() — Devuelve el contexto si está activo, o null.
+  // Si está suspendido, intenta resumirlo (fire-and-forget).
+  // ─────────────────────────────────────────────────────────
+  _ctx() {
+    if (!this.ctx) return null;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume(); // fire-and-forget
+    }
+    // Permitir también 'running'; en caso de que la promesa tarde
+    // unos ms, los nodos de audio ya se pueden crear (iOS lo permite
+    // si el contexto fue creado en el gesto).
+    return (this.ctx.state === 'running' || this.ctx.state === 'suspended')
+      ? this.ctx
+      : null;
   }
 
-  // Sonido seco y corto al deslizar por las letras (retroalimentación táctil auditiva)
-  async playTick() {
+  // ─────────────────────────────────────────────────────────
+  // Sonido corto al deslizar letras
+  // ─────────────────────────────────────────────────────────
+  playTick() {
     if (!this.soundsEnabled) return;
-    const ctx = await this._ensureCtx();
+    const ctx = this._ctx();
     if (!ctx) return;
 
     const osc = ctx.createOscillator();
@@ -75,15 +99,16 @@ class AudioManager {
 
     osc.connect(gain);
     gain.connect(ctx.destination);
-
     osc.start();
     osc.stop(ctx.currentTime + 0.05);
   }
 
-  // Sonido cuando se selecciona una palabra incorrecta o se aborta
-  async playCancel() {
+  // ─────────────────────────────────────────────────────────
+  // Sonido al cancelar / selección incorrecta
+  // ─────────────────────────────────────────────────────────
+  playCancel() {
     if (!this.soundsEnabled) return;
-    const ctx = await this._ensureCtx();
+    const ctx = this._ctx();
     if (!ctx) return;
 
     const osc = ctx.createOscillator();
@@ -98,99 +123,100 @@ class AudioManager {
 
     osc.connect(gain);
     gain.connect(ctx.destination);
-
     osc.start();
     osc.stop(ctx.currentTime + 0.15);
   }
 
+  // ─────────────────────────────────────────────────────────
   // Sonido alegre al encontrar una palabra correcta
-  async playSuccess() {
+  // ─────────────────────────────────────────────────────────
+  playSuccess() {
     if (!this.soundsEnabled) return;
-    const ctx = await this._ensureCtx();
+    const ctx = this._ctx();
     if (!ctx) return;
 
     const now = ctx.currentTime;
-
-    // Acorde arpegiado ascendente: Do - Mi - Sol - Do
     const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-    notes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
+
+    notes.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now + index * 0.08);
+      osc.frequency.setValueAtTime(freq, now + i * 0.08);
 
-      gain.gain.setValueAtTime(0, now + index * 0.08);
-      gain.gain.linearRampToValueAtTime(0.15, now + index * 0.08 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + index * 0.08 + 0.25);
+      gain.gain.setValueAtTime(0, now + i * 0.08);
+      gain.gain.linearRampToValueAtTime(0.15, now + i * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.25);
 
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(now + index * 0.08);
-      osc.stop(now + index * 0.08 + 0.3);
+      osc.start(now + i * 0.08);
+      osc.stop(now + i * 0.08 + 0.3);
     });
   }
 
-  // Fanfarria alegre al completar la sopa de letras completa
-  async playVictory() {
+  // ─────────────────────────────────────────────────────────
+  // Fanfarria al completar el nivel
+  // ─────────────────────────────────────────────────────────
+  playVictory() {
     if (!this.soundsEnabled) return;
-    const ctx = await this._ensureCtx();
+    const ctx = this._ctx();
     if (!ctx) return;
 
     const now = ctx.currentTime;
 
-    // Redoble rápido de notas de escala ascendente
-    const scale = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; // C4 a B4
-    scale.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
+    // Escala ascendente
+    const scale = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88];
+    scale.forEach((freq, i) => {
+      const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, now + index * 0.06);
-      gain.gain.setValueAtTime(0.1, now + index * 0.06);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + index * 0.06 + 0.1);
+      osc.frequency.setValueAtTime(freq, now + i * 0.06);
+      gain.gain.setValueAtTime(0.1, now + i * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.06 + 0.1);
       osc.connect(gain);
       gain.connect(ctx.destination);
-      osc.start(now + index * 0.06);
-      osc.stop(now + index * 0.06 + 0.1);
+      osc.start(now + i * 0.06);
+      osc.stop(now + i * 0.06 + 0.1);
     });
 
     // Gran acorde triunfal
-    const chord = [523.25, 659.25, 783.99, 987.77, 1046.50]; // C5, E5, G5, B5, C6
+    const chord = [523.25, 659.25, 783.99, 987.77, 1046.50];
     const chordDelay = scale.length * 0.06 + 0.05;
-    chord.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+
+    chord.forEach((freq, i) => {
+      const osc    = ctx.createOscillator();
+      const gain   = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
 
       osc.type = 'sawtooth';
-
-      const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(1000, now + chordDelay);
       filter.frequency.exponentialRampToValueAtTime(4000, now + chordDelay + 0.2);
 
-      osc.frequency.setValueAtTime(freq, now + chordDelay + index * 0.03);
-
-      gain.gain.setValueAtTime(0, now + chordDelay + index * 0.03);
-      gain.gain.linearRampToValueAtTime(0.12, now + chordDelay + index * 0.03 + 0.05);
+      osc.frequency.setValueAtTime(freq, now + chordDelay + i * 0.03);
+      gain.gain.setValueAtTime(0, now + chordDelay + i * 0.03);
+      gain.gain.linearRampToValueAtTime(0.12, now + chordDelay + i * 0.03 + 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, now + chordDelay + 1.2);
 
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start(now + chordDelay + index * 0.03);
+      osc.start(now + chordDelay + i * 0.03);
       osc.stop(now + chordDelay + 1.5);
     });
   }
 
-  // Sonido de clic genérico para botones
-  async playClick() {
+  // ─────────────────────────────────────────────────────────
+  // Clic genérico de botón
+  // ─────────────────────────────────────────────────────────
+  playClick() {
     if (!this.soundsEnabled) return;
-    const ctx = await this._ensureCtx();
+    const ctx = this._ctx();
     if (!ctx) return;
 
-    const osc = ctx.createOscillator();
+    const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
 
     osc.type = 'sine';
@@ -202,51 +228,39 @@ class AudioManager {
 
     osc.connect(gain);
     gain.connect(ctx.destination);
-
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
   }
 
-  // Obtener voces disponibles — espera hasta que estén cargadas (fix iOS)
-  _getVoices() {
-    // Intentar cargar de nuevo si aún están vacías
-    if (this._voices.length === 0) {
-      this._voices = window.speechSynthesis.getVoices();
-    }
-    return this._voices;
-  }
-
-  // Leer palabra usando SpeechSynthesis (TTS) en voz alta
+  // ─────────────────────────────────────────────────────────
+  // TTS — Leer una palabra en voz alta
+  // ─────────────────────────────────────────────────────────
   speak(text, lang = 'es-ES') {
     if (!this.ttsEnabled) return;
 
-    // Detener lecturas anteriores en progreso
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
     }
 
+    // Recargar voces si el array está vacío (puede pasar en iOS)
+    if (this._voices.length === 0) {
+      this._voices = window.speechSynthesis.getVoices();
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
+    const langPrefix = lang.split('-')[0];
+    let voice = this._voices.find(v => v.lang.startsWith(langPrefix))
+             || this._voices.find(v => v.lang.startsWith('es'))
+             || this._voices[0]
+             || null;
 
-    const voices = this._getVoices();
-    let voice = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-
-    // Fallback por idioma
-    if (!voice) {
-      voice = voices.find(v => v.lang.startsWith('es')) || voices[0] || null;
-    }
-
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    utterance.lang = lang;
-    utterance.rate = 0.95;
+    if (voice) utterance.voice = voice;
+    utterance.lang  = lang;
+    utterance.rate  = 0.95;
     utterance.pitch = 1.1;
 
-    // iOS Safari a veces necesita un pequeño delay tras cancel()
-    setTimeout(() => {
-      window.speechSynthesis.speak(utterance);
-    }, 50);
+    // iOS Safari necesita un pequeño delay tras cancel() para no ignorar speak()
+    setTimeout(() => window.speechSynthesis.speak(utterance), 80);
   }
 }
 

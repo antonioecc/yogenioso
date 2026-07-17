@@ -31,9 +31,11 @@ class SopaSensorialApp {
       celebration: document.getElementById('celebration-overlay')
     };
 
+    this.deferredPrompt = null;
     this.bindEvents();
     this.updateXPDisplay();
     this.initSensoryCanvas();
+    this.setupPwaInstall();
   }
 
   // Actualizar indicadores de XP en la interfaz
@@ -753,6 +755,43 @@ class SopaSensorialApp {
 
     ctx.shadowBlur = 0;
     requestAnimationFrame(() => this.animateSensoryCanvas());
+  }
+
+  // Configurar botón y comportamiento personalizado de instalación PWA
+  setupPwaInstall() {
+    const installContainer = document.getElementById('pwa-install-container');
+    const installBtn = document.getElementById('btn-pwa-install');
+    
+    if (!installContainer || !installBtn) return;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      this.deferredPrompt = e;
+      installContainer.style.display = 'block';
+    });
+
+    installBtn.addEventListener('click', async () => {
+      if (!this.deferredPrompt) return;
+      audio.playClick();
+      
+      this.deferredPrompt.prompt();
+      
+      const { outcome } = await this.deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        this.totalXP += 50; // Recompensa de 50 XP por instalar
+        this.saveState();
+        this.updateXPDisplay();
+        audio.playSuccess();
+      }
+      
+      this.deferredPrompt = null;
+      installContainer.style.display = 'none';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      installContainer.style.display = 'none';
+      this.deferredPrompt = null;
+    });
   }
 }
 

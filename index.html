@@ -13,6 +13,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="YOGENIOSO">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192.png">
 </head>
 <body>
 
@@ -61,6 +64,13 @@
             <span class="slider"></span>
           </label>
         </div>
+      </div>
+
+      <!-- Botón de instalación PWA -->
+      <div id="pwa-install-container" class="sensory-settings-card" style="display: none; margin-top: 15px; border-color: var(--primary-color); background: rgba(99, 102, 241, 0.15);">
+        <h3>¡Instala YOGENIOSO! 🚀</h3>
+        <p style="font-size: 0.9rem; margin-bottom: 12px; color: var(--text-muted); text-align: center;">Juega a pantalla completa, fijo y sin internet.</p>
+        <button id="btn-pwa-install" class="btn btn-primary" style="width: 100%; padding: 12px;">Instalar como App</button>
       </div>
     </div>
   </section>

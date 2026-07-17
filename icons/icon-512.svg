@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e1b4b" />
+    </linearGradient>
+    <linearGradient id="bubble-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8" />
+      <stop offset="50%" stop-color="#c084fc" />
+      <stop offset="100%" stop-color="#f472b6" />
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="128" fill="url(#bg-grad)" />
+  
+  <!-- Outer Glow Circle -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="url(#bubble-grad)" stroke-width="8" opacity="0.4" />
+  
+  <!-- Inner Decorative Elements representing word search -->
+  <g transform="translate(156, 156)">
+    <!-- Letra 'S' de Sopa -->
+    <text x="30" y="90" font-family="'Outfit', sans-serif" font-size="110" font-weight="900" fill="url(#bubble-grad)">S</text>
+    <!-- Letra 'L' de Letras -->
+    <text x="120" y="160" font-family="'Outfit', sans-serif" font-size="100" font-weight="900" fill="#10b981">L</text>
+  </g>
+  
+  <!-- Magic sparkle stars -->
+  <path d="M120 160 l10-20 l10 20 l20 10 l-20 10 l-10 20 l-10-20 l-20-10 z" fill="#ffd43b" />
+  <path d="M380 120 l6-12 l6 12 l12 6 l-12 6 l-6 12 l-6-12 l-12-6 z" fill="#fab005" />
+  <path d="M370 360 l8-16 l8 16 l16 8 l-16 8 l-8 16 l-8-16 l-16-8 z" fill="#e599f7" />
+</svg>

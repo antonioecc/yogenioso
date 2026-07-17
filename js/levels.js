@@ -239,19 +239,19 @@ export function getLevel(id) {
     // Muy Fácil (Nivel 1 - 50)
     gridSize = 10;
     wordCount = 6;
-    directions = { horizontal: true, vertical: true, diagonal: false, reverse: false };
+    directions = { horizontal: true, vertical: true, diagonal: true, reverse: true };
     xpReward = 100;
   } else if (id <= 200) {
     // Fácil (Nivel 51 - 200)
     gridSize = 11;
     wordCount = 7;
-    directions = { horizontal: true, vertical: true, diagonal: false, reverse: false };
+    directions = { horizontal: true, vertical: true, diagonal: true, reverse: true };
     xpReward = 120;
   } else if (id <= 500) {
     // Medio (Nivel 201 - 500)
     gridSize = 12;
     wordCount = 8;
-    directions = { horizontal: true, vertical: true, diagonal: true, reverse: false };
+    directions = { horizontal: true, vertical: true, diagonal: true, reverse: true };
     xpReward = 180;
   } else if (id <= 800) {
     // Difícil (Nivel 501 - 800)

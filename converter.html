@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Iconos PNG - YOGENIOSO</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .btn {
+      background: #6366f1;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      margin: 20px;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+    .btn:hover {
+      background: #4f46e5;
+    }
+  </style>
+</head>
+<body>
+  <h1>Generador de Iconos PNG para PWA</h1>
+  <p>Los navegadores de algunas tablets requieren iconos en formato PNG para poder habilitar la instalación como App.</p>
+  <p>Haz clic en el botón de abajo para generar y descargar los iconos automáticamente:</p>
+  
+  <button id="btn-generate" class="btn">Descargar Iconos PNG</button>
+  
+  <div style="display:none;">
+    <!-- Cargar SVG original -->
+    <img id="svg-source" src="icons/icon-512.svg" alt="source">
+    <canvas id="canvas-192" width="192" height="192"></canvas>
+    <canvas id="canvas-512" width="512" height="512"></canvas>
+  </div>
+
+  <script>
+    document.getElementById('btn-generate').addEventListener('click', () => {
+      const img = document.getElementById('svg-source');
+      
+      const generateForSize = (canvasId, size, filename) => {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        
+        // Descargar PNG
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+
+      try {
+        generateForSize('canvas-192', 192, 'icon-192.png');
+        setTimeout(() => {
+          generateForSize('canvas-512', 512, 'icon-512.png');
+          alert('¡Iconos generados! Muévelos a la carpeta "icons" de tu proyecto y súbelos a GitHub.');
+        }, 500);
+      } catch (e) {
+        alert('Error al generar: Asegúrate de estar abriendo esta página a través de http://localhost:8000 y no haciendo doble clic en el archivo.');
+      }
+    });
+  </script>
+</body>
+</html>

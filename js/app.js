@@ -347,8 +347,10 @@ class SopaSensorialApp {
         handleMove(touch.clientX, touch.clientY);
       }
     }, { passive: false });
-
-    gridEl.addEventListener('touchend', () => {
+    window.addEventListener('touchend', () => {
+      handleEnd();
+    });
+    window.addEventListener('touchcancel', () => {
       handleEnd();
     });
   }
@@ -446,30 +448,7 @@ class SopaSensorialApp {
     if (!grid) return;
     const gridRect = grid.getBoundingClientRect();
 
-    // 1. Dibujar líneas de palabras encontradas
-    this.solvedPlacements.forEach(line => {
-      const startCellEl = document.querySelector(`.grid-cell[data-r="${line.start.r}"][data-c="${line.start.c}"]`);
-      const endCellEl = document.querySelector(`.grid-cell[data-r="${line.end.r}"][data-c="${line.end.c}"]`);
-      
-      if (startCellEl && endCellEl) {
-        const startRect = startCellEl.getBoundingClientRect();
-        const endRect = endCellEl.getBoundingClientRect();
-        
-        const x1 = (startRect.left + startRect.width / 2) - gridRect.left;
-        const y1 = (startRect.top + startRect.height / 2) - gridRect.top;
-        const x2 = (endRect.left + endRect.width / 2) - gridRect.left;
-        const y2 = (endRect.top + endRect.height / 2) - gridRect.top;
 
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        path.setAttribute('x1', x1);
-        path.setAttribute('y1', y1);
-        path.setAttribute('x2', x2);
-        path.setAttribute('y2', y2);
-        path.setAttribute('class', 'found-line');
-        path.setAttribute('style', `stroke: ${line.color};`);
-        svg.appendChild(path);
-      }
-    });
 
     // 2. Dibujar línea de la selección actual
     if (this.currentPath.length > 1) {

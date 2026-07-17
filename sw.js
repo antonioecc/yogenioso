@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yogenioso-v2';
+const CACHE_NAME = 'yogenioso-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,9 @@ const ASSETS = [
   './js/levels.js',
   './js/generator.js',
   './manifest.json',
-  './icons/icon-512.svg'
+  './icons/icon-512.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 // Instalación del Service Worker e inicio de caché

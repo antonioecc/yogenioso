@@ -31,9 +31,14 @@ body {
   background: var(--bg-gradient);
   color: var(--text-color);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 /* Scrollbars */
@@ -301,7 +306,7 @@ header {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  height: calc(100vh - 100px);
+  height: calc(100dvh - 120px);
 }
 
 .game-layout {
@@ -594,8 +599,9 @@ header {
 #menu-view {
   position: relative;
   overflow: hidden;
-  height: calc(100vh - 100px);
+  height: calc(100dvh - 120px);
   min-height: 500px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 #menu-canvas {

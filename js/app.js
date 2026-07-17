@@ -36,6 +36,15 @@ class SopaSensorialApp {
     this.updateXPDisplay();
     this.initSensoryCanvas();
     this.setupPwaInstall();
+    
+    // Desbloquear AudioContext en iOS Safari con la primera interacción del usuario
+    const unlockAudio = () => {
+      audio.init();
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchend', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchend', unlockAudio);
   }
 
   // Actualizar indicadores de XP en la interfaz
@@ -531,9 +540,7 @@ class SopaSensorialApp {
       }
 
       audio.playSuccess();
-      setTimeout(() => {
-        audio.speak(matchedWord, this.currentLevel.lang === 'en' ? 'en-US' : 'es-ES');
-      }, 300);
+      audio.speak(matchedWord, this.currentLevel.lang === 'en' ? 'en-US' : 'es-ES');
 
       if (this.foundWords.length === this.currentLevel.words.length) {
         this.completeLevel();

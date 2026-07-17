@@ -33,12 +33,35 @@
 
   <!-- VISTA 1: Menú Principal -->
   <section id="menu-view" class="view active">
-    <div class="welcome-title">¡YOGENIOSO!</div>
-    <div class="welcome-subtitle">Descubre palabras con maravillosos destellos y sonidos mágicos.</div>
-    <div class="main-menu-buttons">
-      <button id="btn-play-main" class="btn btn-primary">
-        <span>🎮</span> ¡A JUGAR!
-      </button>
+    <canvas id="menu-canvas"></canvas>
+    <div class="menu-content">
+      <div class="welcome-title">¡YOGENIOSO!</div>
+      <div class="welcome-subtitle">Toca las canicas rebotadoras y resuelve divertidas sopas de letras.</div>
+      
+      <div class="main-menu-buttons">
+        <button id="btn-play-main" class="btn btn-primary">
+          <span>🎮</span> ¡A JUGAR!
+        </button>
+      </div>
+
+      <!-- Ajustes Sensoriales Rápidos -->
+      <div class="sensory-settings-card">
+        <h3>Ajustes Sensoriales</h3>
+        <div class="setting-item">
+          <span>🔊 Efectos de Sonido</span>
+          <label class="switch-toggle">
+            <input type="checkbox" id="chk-sounds" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="setting-item">
+          <span>🗣️ Lectura en Voz Alta (TTS)</span>
+          <label class="switch-toggle">
+            <input type="checkbox" id="chk-tts" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
     </div>
   </section>
 

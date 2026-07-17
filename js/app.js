@@ -38,13 +38,16 @@ class SopaSensorialApp {
     this.setupPwaInstall();
     
     // Desbloquear AudioContext en iOS Safari con la primera interacción del usuario
+    // iOS dispara touchstart antes que touchend, por eso escuchamos los tres eventos
     const unlockAudio = () => {
       audio.init();
-      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
       document.removeEventListener('touchend', unlockAudio);
+      document.removeEventListener('click', unlockAudio);
     };
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+    document.addEventListener('touchend', unlockAudio, { passive: true });
     document.addEventListener('click', unlockAudio);
-    document.addEventListener('touchend', unlockAudio);
   }
 
   // Actualizar indicadores de XP en la interfaz
@@ -764,13 +767,48 @@ class SopaSensorialApp {
     requestAnimationFrame(() => this.animateSensoryCanvas());
   }
 
+  // Detectar si el usuario está en iOS Safari
+  _isIos() {
+    const ua = navigator.userAgent;
+    return (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) && !window.MSStream;
+  }
+
+  // Detectar si ya está instalada como PWA (standalone)
+  _isInStandaloneMode() {
+    return ('standalone' in window.navigator) && window.navigator.standalone;
+  }
+
   // Configurar botón y comportamiento personalizado de instalación PWA
   setupPwaInstall() {
     const installContainer = document.getElementById('pwa-install-container');
     const installBtn = document.getElementById('btn-pwa-install');
-    
+
     if (!installContainer || !installBtn) return;
 
+    // === iOS: No existe beforeinstallprompt. Mostrar instrucciones manuales ===
+    if (this._isIos()) {
+      if (!this._isInStandaloneMode()) {
+        // Mostrar banner con instrucciones de instalación manual para iOS
+        installContainer.style.display = 'block';
+        installContainer.innerHTML = `
+          <h3>¡Instala YOGENIOSO! 🚀</h3>
+          <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center; margin-bottom: 10px;">
+            Juega a pantalla completa, sin internet.
+          </p>
+          <div style="background: rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; font-size: 0.85rem; line-height: 1.8; text-align: left;">
+            <div>1️⃣ Toca el botón <strong style="color:#4dabf7;">Compartir</strong> <span style="font-size:1.1em;">⬆️</span> en Safari</div>
+            <div>2️⃣ Baja y toca <strong style="color:#4dabf7;">"Añadir a pantalla de inicio"</strong> <span style="font-size:1.1em;">➕</span></div>
+            <div>3️⃣ Toca <strong style="color:#4dabf7;">"Añadir"</strong> en la esquina superior derecha</div>
+          </div>
+        `;
+        // El botón ya no se necesita como botón de clic en iOS
+        const btn = installContainer.querySelector('#btn-pwa-install');
+        if (btn) btn.style.display = 'none';
+      }
+      return; // No configurar beforeinstallprompt en iOS
+    }
+
+    // === Android / Chrome: flujo normal con beforeinstallprompt ===
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       this.deferredPrompt = e;
@@ -780,9 +818,9 @@ class SopaSensorialApp {
     installBtn.addEventListener('click', async () => {
       if (!this.deferredPrompt) return;
       audio.playClick();
-      
+
       this.deferredPrompt.prompt();
-      
+
       const { outcome } = await this.deferredPrompt.userChoice;
       if (outcome === 'accepted') {
         this.totalXP += 50; // Recompensa de 50 XP por instalar
@@ -790,7 +828,7 @@ class SopaSensorialApp {
         this.updateXPDisplay();
         audio.playSuccess();
       }
-      
+
       this.deferredPrompt = null;
       installContainer.style.display = 'none';
     });

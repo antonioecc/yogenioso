@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sopa-sensorial-v1';
+const CACHE_NAME = 'yogenioso-v2';
 const ASSETS = [
   './',
   './index.html',

@@ -243,14 +243,12 @@ class SopaSensorialApp {
     gridContainer.innerHTML = '';
 
     const size = this.gridData.grid.length;
-    
-    // Crear el elemento de cuadrícula
     const gridEl = document.createElement('div');
     gridEl.className = 'word-search-grid';
     gridEl.id = 'word-search-grid';
     gridEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+    gridEl.style.setProperty('--grid-size', size);
 
-    // Añadir letras
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         const cell = document.createElement('div');

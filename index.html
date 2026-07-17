@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>YOGENIOSO</title>
+  <meta name="description" content="Juego interactivo y sensorial de Sopa de Letras adaptado para tablets de 10 pulgadas.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  
+  <!-- Soporte para iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="YOGENIOSO">
+</head>
+<body>
+
+  <!-- Encabezado General -->
+  <header>
+    <div class="logo-container">
+      <span class="logo-icon">🔮</span>
+      <span class="logo-text">YOGENIOSO</span>
+    </div>
+    <div class="header-stats">
+      <div class="xp-badge">
+        <span>✨</span>
+        <span class="xp-value">0</span>
+        <span>XP</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- VISTA 1: Menú Principal -->
+  <section id="menu-view" class="view active">
+    <div class="welcome-title">¡YOGENIOSO!</div>
+    <div class="welcome-subtitle">Descubre palabras con maravillosos destellos y sonidos mágicos.</div>
+    <div class="main-menu-buttons">
+      <button id="btn-play-main" class="btn btn-primary">
+        <span>🎮</span> ¡A JUGAR!
+      </button>
+    </div>
+  </section>
+
+  <!-- VISTA 2: Mapa de Niveles -->
+  <section id="levels-view" class="view">
+    <div class="levels-header">
+      <h2>Explora los Mundos</h2>
+      <button id="btn-back-levels" class="btn btn-secondary">
+        <span>🏠</span> Menú Principal
+      </button>
+    </div>
+    <div class="levels-grid">
+      <!-- Los niveles se generarán dinámicamente -->
+    </div>
+  </section>
+
+  <!-- VISTA 3: Tablero de Juego -->
+  <section id="game-view" class="view">
+    <div class="levels-header">
+      <h2 id="game-title">Sopa de Letras</h2>
+      <button id="btn-back-game" class="btn btn-secondary">
+        <span>🗺️</span> Mapa de Niveles
+      </button>
+    </div>
+    
+    <div class="game-layout">
+      <!-- Lado Izquierdo: Cuadrícula -->
+      <div class="board-container" id="grid-container">
+        <!-- Generado dinámicamente -->
+      </div>
+      
+      <!-- Lado Derecho: Palabras a buscar -->
+      <div class="words-panel">
+        <div class="words-panel-header">
+          <h3>Encuentra estas palabras:</h3>
+        </div>
+        <div class="words-list" id="words-list">
+          <!-- Generado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIÁLOGO: Celebración al Completar Nivel -->
+  <div id="celebration-overlay" class="overlay">
+    <div class="celebration-card">
+      <div class="celebration-trophy">🏆</div>
+      <div class="celebration-title">¡LO LOGRASTE!</div>
+      <p>Has completado esta divertida sopa de letras.</p>
+      
+      <div class="celebration-stats">
+        <div class="stat-box">
+          <div class="stat-val" id="celebration-xp">+100</div>
+          <div class="stat-label">PUNTOS XP</div>
+        </div>
+      </div>
+
+      <button id="btn-next-level" class="btn btn-primary" style="font-size: 1.2rem; padding: 15px 30px; width: 100%;">
+        <span>🚀</span> ¡Siguiente Nivel!
+      </button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="js/app.js"></script>
+  <script>
+    // Registro de Service Worker para PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+          .catch(err => console.error('Error al registrar Service Worker:', err));
+      });
+    }
+  </script>
+</body>
+</html>

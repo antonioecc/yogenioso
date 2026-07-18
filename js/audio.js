@@ -4,6 +4,15 @@
 // de forma SÍNCRONA dentro del handler del gesto del usuario.
 // Usar async/await rompe el contexto del gesto en iOS y el audio
 // queda bloqueado. Todos los métodos son SÍNCRONOS.
+//
+// iOS como PWA instalada (standalone) además:
+//  - Pone el AudioContext en estado 'interrupted' (no estándar) al
+//    bloquear la pantalla o ir a segundo plano; hay que reanudarlo.
+//  - speechSynthesis debe "primarse" dentro de un gesto del usuario
+//    o ignora en silencio los speak() hechos fuera de un gesto.
+//  - El motor TTS queda pausado/atascado al volver del background.
+//  - La utterance debe mantenerse referenciada o el recolector de
+//    basura la destruye y corta la lectura a mitad de palabra.
 // ============================================================
 
 class AudioManager {
@@ -12,15 +21,43 @@ class AudioManager {
     this.ttsEnabled = true;
     this.soundsEnabled = true;
     this._unlocked = false;
+    this._ttsPrimed = false;
     this._voices = [];
+    this._utterance = null;
+    this._speakTimer = null;
+    this._aliveTimer = null;
 
     // Cargar voces TTS lo antes posible
     // iOS entrega las voces de forma diferida; necesitamos onvoiceschanged
-    this._loadVoices();
-    if (typeof window.speechSynthesis !== 'undefined' &&
-        window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = () => this._loadVoices();
+    if ('speechSynthesis' in window) {
+      this._loadVoices();
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = () => this._loadVoices();
+      }
     }
+
+    // iOS 16.4+: reproducir audio aunque el interruptor físico del
+    // dispositivo esté en modo silencio (causa nº1 de "no suena nada")
+    try {
+      if ('audioSession' in navigator) {
+        navigator.audioSession.type = 'playback';
+      }
+    } catch (e) { /* no soportado en este navegador */ }
+
+    // Al volver del background, iOS deja el AudioContext en 'interrupted'
+    // y el motor TTS pausado con la cola atascada: reanudar y limpiar.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.resume();
+        this._checkAlive();
+        if ('speechSynthesis' in window) {
+          try {
+            window.speechSynthesis.resume();
+            window.speechSynthesis.cancel();
+          } catch (e) { /* ignorar */ }
+        }
+      }
+    });
   }
 
   _loadVoices() {
@@ -32,19 +69,23 @@ class AudioManager {
 
   // ─────────────────────────────────────────────────────────
   // init() — DEBE llamarse SÍNCRONAMENTE desde un gesto del usuario.
-  // Crea el AudioContext, lo resume y toca un buffer silencioso
-  // para desbloquear el audio en iOS. NO usa await.
+  // Es idempotente y barato: puede (y debe) llamarse en cada toque,
+  // porque tras una interrupción de iOS hace falta un gesto nuevo
+  // para reanudar el contexto. NO usa await.
   // ─────────────────────────────────────────────────────────
   init() {
     try {
-      // 1. Crear el contexto (síncrono — dentro del gesto)
-      if (!this.ctx) {
+      // 1. Crear el contexto (síncrono — dentro del gesto).
+      //    iOS puede cerrarlo tras una interrupción larga: recrearlo.
+      if (!this.ctx || this.ctx.state === 'closed') {
         this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this._unlocked = false;
       }
 
-      // 2. Resume síncrono — iOS exige que resume() se llame en el gesto.
+      // 2. Resume síncrono — cubre 'suspended' y también el estado
+      //    'interrupted' que iOS usa al bloquear pantalla / cambiar de app.
       //    NO hacemos await; solo disparamos la promesa.
-      if (this.ctx.state === 'suspended') {
+      if (this.ctx.state !== 'running') {
         this.ctx.resume(); // fire-and-forget intencional
       }
 
@@ -57,26 +98,87 @@ class AudioManager {
         source.start(0);
         this._unlocked = true;
       }
+
+      // 4. Primar el TTS dentro del gesto: sin esto, iOS (sobre todo
+      //    como PWA instalada) ignora los speak() posteriores que
+      //    llegan fuera de un gesto del usuario.
+      if (!this._ttsPrimed && 'speechSynthesis' in window) {
+        const warmup = new SpeechSynthesisUtterance('');
+        warmup.volume = 0;
+        window.speechSynthesis.speak(warmup);
+        this._ttsPrimed = true;
+      }
+
+      // 5. Vigilar que el contexto realmente suena (ver _checkAlive)
+      this._checkAlive();
     } catch (e) {
       console.warn('AudioContext init error:', e);
     }
   }
 
   // ─────────────────────────────────────────────────────────
-  // _ctx() — Devuelve el contexto si está activo, o null.
-  // Si está suspendido, intenta resumirlo (fire-and-forget).
+  // _checkAlive() — Detecta el contexto "zombi" de iOS: tras un
+  // bloqueo de pantalla o background largo, el contexto puede volver
+  // reportando 'running' pero con la sesión de audio muerta (no suena
+  // nada y su reloj no avanza). Un contexto sano en 'running' SIEMPRE
+  // avanza currentTime; si en 300ms no se movió, se cierra y se anula
+  // para que init() (que corre en cada gesto) lo recree desbloqueado.
+  // ─────────────────────────────────────────────────────────
+  _checkAlive() {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    if (this._aliveTimer) return; // ya hay una comprobación en curso
+
+    const t0 = ctx.currentTime;
+    this._aliveTimer = setTimeout(() => {
+      this._aliveTimer = null;
+      if (this.ctx !== ctx) return; // ya fue recreado por otra vía
+      if (ctx.state === 'running' && ctx.currentTime === t0) {
+        try { ctx.close(); } catch (e) { /* ignorar */ }
+        this.ctx = null;
+        this._unlocked = false;
+      }
+    }, 300);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // resume() — Reanuda el contexto si iOS lo suspendió o
+  // interrumpió. Barato; seguro de llamar en cualquier momento.
+  // ─────────────────────────────────────────────────────────
+  resume() {
+    if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') {
+      this.ctx.resume(); // fire-and-forget
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // _ctx() — Devuelve el contexto listo para programar nodos, o null.
+  // Reanuda (fire-and-forget) si está 'suspended' o 'interrupted';
+  // los nodos programados sonarán en cuanto vuelva a 'running'.
   // ─────────────────────────────────────────────────────────
   _ctx() {
     if (!this.ctx) return null;
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume(); // fire-and-forget
+
+    // iOS puede cerrar el contexto tras una interrupción larga: recrearlo
+    if (this.ctx.state === 'closed') {
+      try {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this._unlocked = false;
+      } catch (e) {
+        return null;
+      }
     }
-    // Permitir también 'running'; en caso de que la promesa tarde
-    // unos ms, los nodos de audio ya se pueden crear (iOS lo permite
-    // si el contexto fue creado en el gesto).
-    return (this.ctx.state === 'running' || this.ctx.state === 'suspended')
-      ? this.ctx
-      : null;
+
+    if (this.ctx.state !== 'running') {
+      this.ctx.resume(); // fire-and-forget: cubre 'suspended' e 'interrupted'
+      // Durante una interrupción de iOS (llamada, Siri) currentTime está
+      // congelado: descartar el efecto para no acumular nodos que sonarían
+      // todos a la vez en ráfaga al reanudar. 'suspended' sí se permite:
+      // es el resume en curso dentro del propio gesto del usuario.
+      if (this.ctx.state === 'interrupted') return null;
+    }
+
+    return this.ctx;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -237,14 +339,23 @@ class AudioManager {
   // ─────────────────────────────────────────────────────────
   speak(text, lang = 'es-ES') {
     if (!this.ttsEnabled) return;
+    if (!('speechSynthesis' in window)) return;
 
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    const synth = window.speechSynthesis;
+
+    // Descartar cualquier lectura nuestra aún pendiente de programar
+    if (this._speakTimer) {
+      clearTimeout(this._speakTimer);
+      this._speakTimer = null;
     }
+
+    // iOS deja el motor pausado tras volver del background y entonces
+    // speak() no suena: resume() lo desatasca antes de hablar.
+    try { synth.resume(); } catch (e) { /* ignorar */ }
 
     // Recargar voces si el array está vacío (puede pasar en iOS)
     if (this._voices.length === 0) {
-      this._voices = window.speechSynthesis.getVoices();
+      this._voices = synth.getVoices();
     }
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -259,8 +370,25 @@ class AudioManager {
     utterance.rate  = 0.95;
     utterance.pitch = 1.1;
 
-    // iOS Safari necesita un pequeño delay tras cancel() para no ignorar speak()
-    setTimeout(() => window.speechSynthesis.speak(utterance), 80);
+    // Mantener una referencia viva: sin ella, iOS recolecta la
+    // utterance y corta la lectura a mitad de palabra.
+    this._utterance = utterance;
+    utterance.onend = () => {
+      if (this._utterance === utterance) this._utterance = null;
+    };
+
+    if (synth.speaking || synth.pending) {
+      // iOS ignora un speak() inmediato tras cancel(): pequeño delay.
+      synth.cancel();
+      this._speakTimer = setTimeout(() => {
+        this._speakTimer = null;
+        synth.speak(utterance);
+      }, 100);
+    } else {
+      // Camino directo y SÍNCRONO: conserva el contexto del gesto del
+      // usuario, requisito de iOS para que la lectura suene.
+      synth.speak(utterance);
+    }
   }
 }
 

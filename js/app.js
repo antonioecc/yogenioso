@@ -37,14 +37,12 @@ class SopaSensorialApp {
     this.initSensoryCanvas();
     this.setupPwaInstall();
     
-    // Desbloquear AudioContext en iOS Safari con la primera interacción del usuario
-    // iOS dispara touchstart antes que touchend, por eso escuchamos los tres eventos
-    const unlockAudio = () => {
-      audio.init();
-      document.removeEventListener('touchstart', unlockAudio);
-      document.removeEventListener('touchend', unlockAudio);
-      document.removeEventListener('click', unlockAudio);
-    };
+    // Desbloquear AudioContext en iOS Safari con cada interacción del usuario.
+    // iOS dispara touchstart antes que touchend, por eso escuchamos los tres eventos.
+    // Los listeners NO se eliminan tras el primer toque: cuando iOS interrumpe
+    // el audio (bloqueo de pantalla, llamada, cambio de app) hace falta un
+    // gesto nuevo para reanudar el contexto. init() es idempotente y barato.
+    const unlockAudio = () => audio.init();
     document.addEventListener('touchstart', unlockAudio, { passive: true });
     document.addEventListener('touchend', unlockAudio, { passive: true });
     document.addEventListener('click', unlockAudio);

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>YOGENIOSO</title>
   <meta name="description" content="Juego interactivo y sensorial de Sopa de Letras adaptado para tablets de 10 pulgadas.">
-  <link rel="stylesheet" href="css/styles.css?v=6">
-  <link rel="manifest" href="manifest.json?v=6">
+  <link rel="stylesheet" href="css/styles.css?v=7">
+  <link rel="manifest" href="manifest.json?v=7">
   <meta name="theme-color" content="#0f172a">
   
   <!-- Soporte para iOS PWA -->
@@ -138,12 +138,15 @@
   </div>
 
   <!-- Scripts -->
-  <script type="module" src="js/app.js?v=6"></script>
+  <script type="module" src="js/app.js?v=7"></script>
   <script>
     // Registro de Service Worker para PWA con autorecarga al actualizar
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js?v=6').then(reg => {
+        // Registrar SIN query de versión: el navegador ya revalida el script
+        // byte a byte, y cambiar la URL registrada fuerza un ciclo extra de
+        // instalación + recarga en cada dispositivo con cada release.
+        navigator.serviceWorker.register('sw.js').then(reg => {
           console.log('Service Worker registrado:', reg.scope);
           
           reg.addEventListener('updatefound', () => {

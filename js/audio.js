@@ -18,7 +18,9 @@
 class AudioManager {
   constructor() {
     this.ctx = null;
-    this.ttsEnabled = true;
+    // Apagado por defecto: el usuario lo enciende con un toque real, y esa
+    // activación ("Voz encendida") es la que desbloquea el TTS en iOS.
+    this.ttsEnabled = false;
     this.soundsEnabled = true;
     this._unlocked = false;
     this._ttsPrimed = false;

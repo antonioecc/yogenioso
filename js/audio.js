@@ -101,10 +101,15 @@ class AudioManager {
 
       // 4. Primar el TTS dentro del gesto: sin esto, iOS (sobre todo
       //    como PWA instalada) ignora los speak() posteriores que
-      //    llegan fuera de un gesto del usuario.
+      //    llegan fuera de un gesto del usuario. Debe ser una utterance
+      //    REAL (texto no vacío): iOS descarta las vacías sin desbloquear
+      //    el motor, por eso hasta ahora había que apagar y encender el
+      //    interruptor de voz para que funcionara.
       if (!this._ttsPrimed && 'speechSynthesis' in window) {
-        const warmup = new SpeechSynthesisUtterance('');
+        try { window.speechSynthesis.resume(); } catch (e) { /* ignorar */ }
+        const warmup = new SpeechSynthesisUtterance(' ');
         warmup.volume = 0;
+        warmup.lang = 'es-ES';
         window.speechSynthesis.speak(warmup);
         this._ttsPrimed = true;
       }
